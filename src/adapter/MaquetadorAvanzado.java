@@ -4,101 +4,100 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-public class MaquetadorAvanzado implements InterfazRequerida { // Clase que implementa la funcionalidad avanzada de maquetado utilizando MaquetadorBasico como adaptador
+public class MaquetadorAvanzado implements InterfazRequerida {
     
     private MaquetadorBasico maquetadorBasico;
 
-    // Constructor que inicializa el MaquetadorBasico
     public MaquetadorAvanzado() {
         this.maquetadorBasico = new MaquetadorBasico();
     }
 
-    // Implementación de los métodos de la InterfazRequerida utilizando MaquetadorBasico
     @Override
     public void unir(String archivo1, String archivo2, String archivoSalida) {
         try {
-            Files.deleteIfExists(Paths.get(archivoSalida));
-            List<String> lineas1 = Files.readAllLines(Paths.get(archivo1));
-            List<String> lineas2 = Files.readAllLines(Paths.get(archivo2));
+            new File(archivoSalida).delete();
             
-            List<String> resultado = new ArrayList<>();
-            resultado.addAll(lineas1);
-            resultado.addAll(lineas2);
+            int total1 = contarLineas(archivo1);
+            int total2 = contarLineas(archivo2);
             
-            Files.write(Paths.get(archivoSalida), resultado);
+            String contenido1 = maquetadorBasico.extraerParrafo(archivo1, 1, total1);
+            maquetadorBasico.anadirTexto(archivoSalida, contenido1);
+            
+            String contenido2 = maquetadorBasico.extraerParrafo(archivo2, 1, total2);
+            maquetadorBasico.anadirTexto(archivoSalida, contenido2);
+            
             System.out.println("Archivos unidos correctamente en: " + archivoSalida);
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.err.println("Error al unir archivos: " + e.getMessage());
         }
     }
 
-    // Método para combinar dos archivos intercalando sus líneas
     @Override
     public void combinar(String archivo1, String archivo2, String archivoSalida) {
         try {
-            Files.deleteIfExists(Paths.get(archivoSalida));
-            List<String> lineas1 = Files.readAllLines(Paths.get(archivo1));
-            List<String> lineas2 = Files.readAllLines(Paths.get(archivo2));
+            new File(archivoSalida).delete();
             
-            List<String> resultado = new ArrayList<>();
-            int max = Math.max(lineas1.size(), lineas2.size());
+            int total1 = contarLineas(archivo1);
+            int total2 = contarLineas(archivo2);
             
-            for (int i = 0; i < max; i++) {
-                if (i < lineas1.size()) {
-                    resultado.add(lineas1.get(i));
+            int max = Math.max(total1, total2);
+            
+            for (int i = 1; i <= max; i++) {
+                if (i <= total1) {
+                    String linea = maquetadorBasico.extraerParrafo(archivo1, i, i);
+                    maquetadorBasico.anadirTexto(archivoSalida, linea);
                 }
-                if (i < lineas2.size()) {
-                    resultado.add(lineas2.get(i));
+                if (i <= total2) {
+                    String linea = maquetadorBasico.extraerParrafo(archivo2, i, i);
+                    maquetadorBasico.anadirTexto(archivoSalida, linea);
                 }
             }
             
-            Files.write(Paths.get(archivoSalida), resultado);
             System.out.println("Archivos combinados correctamente en: " + archivoSalida);
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.err.println("Error al combinar archivos: " + e.getMessage());
         }
     }
 
-    // Método para separar un archivo en varias partes a partir de una lista de puntos de corte
     @Override
     public void separar(String archivoEntrada, List<Integer> puntosCorte, String prefijoSalida) {
         try {
-            List<String> lineas = Files.readAllLines(Paths.get(archivoEntrada));
             List<Integer> puntos = new ArrayList<>(puntosCorte);
             Collections.sort(puntos);
             
-            int inicio = 0;
+            String archivoActual = archivoEntrada;
             int numArchivo = 1;
             
             for (int punto : puntos) {
-                List<String> parte = new ArrayList<>();
-                for (int i = inicio; i < punto && i < lineas.size(); i++) {
-                    parte.add(lineas.get(i));
-                }
+                String[] partes = maquetadorBasico.dividir(archivoActual, punto);
                 
-                if (!parte.isEmpty()) {
-                    String nombreArchivo = prefijoSalida + "_" + numArchivo + ".txt";
-                    Files.write(Paths.get(nombreArchivo), parte);
-                    System.out.println("Creado: " + nombreArchivo + " (" + parte.size() + " líneas)");
-                    numArchivo++;
-                }
-                
-                inicio = punto;
-            }
-            
-            List<String> parteFinal = new ArrayList<>();
-            for (int i = inicio; i < lineas.size(); i++) {
-                parteFinal.add(lineas.get(i));
-            }
-            
-            if (!parteFinal.isEmpty()) {
                 String nombreArchivo = prefijoSalida + "_" + numArchivo + ".txt";
-                Files.write(Paths.get(nombreArchivo), parteFinal);
-                System.out.println("Creado: " + nombreArchivo + " (" + parteFinal.size() + " líneas)");
+                new File(nombreArchivo).delete();
+                maquetadorBasico.anadirTexto(nombreArchivo, partes[0]);
+                System.out.println("Creado: " + nombreArchivo);
+                numArchivo++;
+                
+                archivoActual = prefijoSalida + "_temp.txt";
+                new File(archivoActual).delete();
+                maquetadorBasico.anadirTexto(archivoActual, partes[1]);
             }
             
-        } catch (IOException e) {
+            String nombreArchivo = prefijoSalida + "_" + numArchivo + ".txt";
+            new File(nombreArchivo).delete();
+            
+            String resto = maquetadorBasico.extraerParrafo(archivoActual, 1, contarLineas(archivoActual));
+            maquetadorBasico.anadirTexto(nombreArchivo, resto);
+            System.out.println("Creado: " + nombreArchivo);
+            
+            new File(archivoActual).delete();
+            
+        } catch (Exception e) {
             System.err.println("Error al separar archivo: " + e.getMessage());
         }
+    }
+    
+    private int contarLineas(String archivo) throws IOException {
+        List<String> lineas = Files.readAllLines(Paths.get(archivo));
+        return lineas.size();
     }
 }
